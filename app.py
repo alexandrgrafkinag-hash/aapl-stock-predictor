@@ -59,7 +59,7 @@ model_choice = st.sidebar.selectbox(
     ["Ridge Regression (Best)", "Random Forest", "KNN Regressor"]
 )
 st.sidebar.markdown("---")
-st.sidebar.info("Course: MO 3208\nDataset: AAPL Yahoo Finance\nPeriod: 2020-2026\nTask: Regression")
+st.sidebar.info("Group: CS-2406\nDataset: AAPL Yahoo Finance\nPeriod: 2020-2026\nTask: Regression")
 
 st.header("Dataset Overview")
 col1, col2, col3, col4 = st.columns(4)
