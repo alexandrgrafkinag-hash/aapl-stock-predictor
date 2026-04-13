@@ -169,4 +169,4 @@ if st.button("Predict Closing Price", use_container_width=True):
     c3.metric("Model Used", selected_name)
 
 st.markdown("---")
-st.caption("MO 3208 Machine Learning Algorithms | Astana IT University 2026")
+st.caption("CS-2406 | Alexander Grafkin | Artyom Rakhimzhanov | Mukhamedkarim Kydyrali")
