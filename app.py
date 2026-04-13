@@ -63,13 +63,13 @@ st.sidebar.info("Course: MO 3208\nDataset: AAPL Yahoo Finance\nPeriod: 2020-2026
 
 st.header("Dataset Overview")
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Records", f"{len(df):,}")
+col1.metric("Total Records", str(len(df)))
 col2.metric("Date Range", "2020 - 2026")
 col3.metric("Features Used", "7")
-col4.metric("Latest Close", f"${df['Close'].iloc[-1]:.2f}")
+col4.metric("Latest Close", "$" + str(round(float(df['Close'].iloc[-1]), 2)))
 
 with st.expander("View Raw Data"):
-    st.dataframe(df[['Date','Open','High','Low','Close','Volume']].tail(20))
+    st.dataframe(df[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']].tail(20))
 
 st.header("AAPL Closing Price History")
 fig1, ax1 = plt.subplots(figsize=(12, 4))
@@ -87,9 +87,9 @@ plt.close()
 
 st.header("Model Performance Comparison")
 y_test_inv = scaler_y.inverse_transform(y_test)
-ridge_pred = scaler_y.inverse_transform(ridge.predict(X_test).reshape(-1,1))
-rf_pred    = scaler_y.inverse_transform(rf.predict(X_test).reshape(-1,1))
-knn_pred   = scaler_y.inverse_transform(knn.predict(X_test).reshape(-1,1))
+ridge_pred = scaler_y.inverse_transform(ridge.predict(X_test).reshape(-1, 1))
+rf_pred = scaler_y.inverse_transform(rf.predict(X_test).reshape(-1, 1))
+knn_pred = scaler_y.inverse_transform(knn.predict(X_test).reshape(-1, 1))
 
 results_df = pd.DataFrame({
     'Model': ['Ridge Regression', 'Random Forest', 'KNN Regressor'],
@@ -150,4 +150,23 @@ with col2:
 
 price_range = high_price - low_price
 ma_7 = float(df['Close'].tail(7).mean())
-ma_30 = float(df['Close'].tai
+ma_30 = float(df['Close'].tail(30).mean())
+
+if st.button("Predict Closing Price", use_container_width=True):
+    input_data = np.array([[open_price, high_price, low_price, volume, price_range, ma_7, ma_30]])
+    input_scaled = scaler_X.transform(input_data)
+    if model_choice == "Ridge Regression (Best)":
+        model = ridge
+    elif model_choice == "Random Forest":
+        model = rf
+    else:
+        model = knn
+    prediction = scaler_y.inverse_transform(model.predict(input_scaled).reshape(-1, 1))[0][0]
+    st.success("Predicted Closing Price: $" + str(round(prediction, 2)))
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Open Price", "$" + str(round(open_price, 2)))
+    c2.metric("Predicted Close", "$" + str(round(prediction, 2)))
+    c3.metric("Model Used", selected_name)
+
+st.markdown("---")
+st.caption("MO 3208 Machine Learning Algorithms | Astana IT University 2026")
