@@ -19,21 +19,11 @@ st.markdown("---")
 
 @st.cache_data
 def load_data():
-    # Download AAPL data from Yahoo Finance
     raw = yf.download("AAPL", start="2020-01-01", end="2026-04-13", auto_adjust=True)
-    
-    # Flatten multi-level columns if present
     if isinstance(raw.columns, pd.MultiIndex):
         raw.columns = raw.columns.get_level_values(0)
-    
-    # Reset index to get Date as column
     df = raw.reset_index()
-    
-    # Keep only needed columns
     df = df[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']].copy()
-    df.columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
-    
-    # Feature engineering
     df['Price_Range'] = df['High'] - df['Low']
     df['Price_Change'] = df['Close'] - df['Open']
     df['MA_7']  = df['Close'].rolling(window=7).mean()
@@ -43,19 +33,18 @@ def load_data():
     return df
 
 @st.cache_resource
-def train_models(df):
+def train_models(_df):
     features = ['Open', 'High', 'Low', 'Volume', 'Price_Range', 'MA_7', 'MA_30']
     target = 'Close'
     scaler_X = MinMaxScaler()
     scaler_y = MinMaxScaler()
-    X = scaler_X.fit_transform(df[features])
-    y = scaler_y.fit_transform(df[[target]])
+    X = scaler_X.fit_transform(_df[features])
+    y = scaler_y.fit_transform(_df[[target]])
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, shuffle=False)
-    ridge = Ridge(alpha=0.001, fit_intercept=True)
+    ridge = Ridge(alpha=0.001)
     ridge.fit(X_train, y_train.ravel())
-    rf = RandomForestRegressor(n_estimators=200, max_depth=None,
-                                max_features='sqrt', random_state=42)
+    rf = RandomForestRegressor(n_estimators=100, random_state=42)
     rf.fit(X_train, y_train.ravel())
     knn = KNeighborsRegressor(n_neighbors=5)
     knn.fit(X_train, y_train.ravel())
@@ -72,12 +61,7 @@ model_choice = st.sidebar.selectbox(
     ["Ridge Regression (Best)", "Random Forest", "KNN Regressor"]
 )
 st.sidebar.markdown("---")
-st.sidebar.info("""
-**Course:** MO 3208
-**Dataset:** AAPL - Yahoo Finance
-**Period:** 2020–2026
-**Task:** Regression
-""")
+st.sidebar.info("**Course:** MO 3208\n\n**Dataset:** AAPL - Yahoo Finance\n\n**Period:** 2020–2026\n\n**Task:** Regression")
 
 # Section 1: Overview
 st.header("📊 Dataset Overview")
@@ -91,52 +75,4 @@ with st.expander("View Raw Data"):
     st.dataframe(df[['Date','Open','High','Low','Close','Volume']].tail(20))
 
 # Section 2: Price Chart
-st.header("📉 AAPL Closing Price History")
-fig1, ax1 = plt.subplots(figsize=(12, 4))
-ax1.plot(df['Date'], df['Close'], color='steelblue', linewidth=1.5, label='Close')
-ax1.plot(df['Date'], df['MA_7'],  color='orange', linewidth=1, label='MA 7')
-ax1.plot(df['Date'], df['MA_30'], color='red', linewidth=1, label='MA 30')
-ax1.set_title('AAPL Closing Price with Moving Averages')
-ax1.set_xlabel('Date')
-ax1.set_ylabel('Price (USD)')
-ax1.legend()
-ax1.grid(alpha=0.3)
-plt.tight_layout()
-st.pyplot(fig1)
-
-# Section 3: Model Performance
-st.header("🤖 Model Performance Comparison")
-y_test_inv = scaler_y.inverse_transform(y_test)
-
-def get_metrics(model, X_test, y_test_inv, scaler_y):
-    pred = model.predict(X_test)
-    pred_inv = scaler_y.inverse_transform(pred.reshape(-1,1))
-    return {
-        'MAE': round(mean_absolute_error(y_test_inv, pred_inv), 4),
-        'MSE': round(mean_squared_error(y_test_inv, pred_inv), 4),
-        'R²':  round(r2_score(y_test_inv, pred_inv), 4),
-        'pred_inv': pred_inv
-    }
-
-ridge_m = get_metrics(ridge, X_test, y_test_inv, scaler_y)
-rf_m    = get_metrics(rf,    X_test, y_test_inv, scaler_y)
-knn_m   = get_metrics(knn,   X_test, y_test_inv, scaler_y)
-
-results_df = pd.DataFrame({
-    'Model': ['Ridge Regression', 'Random Forest', 'KNN Regressor'],
-    'MAE':   [ridge_m['MAE'], rf_m['MAE'], knn_m['MAE']],
-    'MSE':   [ridge_m['MSE'], rf_m['MSE'], knn_m['MSE']],
-    'R²':    [ridge_m['R²'],  rf_m['R²'],  knn_m['R²']]
-})
-st.dataframe(results_df, use_container_width=True)
-
-# Chart based on selected model
-if model_choice == "Ridge Regression (Best)":
-    selected_pred, selected_name, color = ridge_m['pred_inv'], "Ridge Regression", 'steelblue'
-elif model_choice == "Random Forest":
-    selected_pred, selected_name, color = rf_m['pred_inv'], "Random Forest", 'green'
-else:
-    selected_pred, selected_name, color = knn_m['pred_inv'], "KNN Regressor", 'red'
-
-fig2, ax2 = plt.subplots(figsize=(12, 4))
-ax2.plot(y_test_inv,    label='Actual Price', color='black', linewidth=2)
+st.header("📉 AAPL Closing
