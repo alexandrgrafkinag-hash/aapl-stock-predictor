@@ -27,13 +27,16 @@ def load_data():
         st.stop()
 
     if raw is None or raw.empty:
-        st.error("❌ Yahoo Finance не вернул данные. Попробуй перезапустить приложение (Manage App → Reboot).")
+        st.error("❌ Yahoo Finance не вернул данные. Попробуй Manage App → Reboot.")
         st.stop()
 
     raw = raw.reset_index()
 
     if 'Datetime' in raw.columns:
         raw = raw.rename(columns={'Datetime': 'Date'})
+
+    # ✅ Убираем timezone из даты — иначе matplotlib падает
+    raw['Date'] = pd.to_datetime(raw['Date']).dt.tz_localize(None)
 
     df = raw[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']].copy()
     df['Price_Range'] = df['High'] - df['Low']
@@ -76,4 +79,22 @@ st.sidebar.info("Course: MO 3208\nDataset: AAPL Yahoo Finance\nPeriod: 2020-2026
 st.header("Dataset Overview")
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Records", str(len(df)))
-col
+col2.metric("Date Range", "2020 - 2026")
+col3.metric("Features Used", "7")
+col4.metric("Latest Close", "$" + str(round(float(df['Close'].iloc[-1]), 2)))
+
+with st.expander("View Raw Data"):
+    st.dataframe(df[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']].tail(20))
+
+st.header("AAPL Closing Price History")
+fig1, ax1 = plt.subplots(figsize=(12, 4))
+ax1.plot(df['Date'], df['Close'], color='steelblue', linewidth=1.5, label='Close')
+ax1.plot(df['Date'], df['MA_7'], color='orange', linewidth=1, label='MA 7')
+ax1.plot(df['Date'], df['MA_30'], color='red', linewidth=1, label='MA 30')
+ax1.set_title('AAPL Closing Price with Moving Averages')
+ax1.set_xlabel('Date')
+ax1.set_ylabel('Price (USD)')
+ax1.legend()
+ax1.grid(alpha=0.3)
+plt.tight_layout()
+st.pyplot
