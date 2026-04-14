@@ -20,19 +20,10 @@ st.markdown("---")
 @st.cache_data
 def load_data():
     raw = yf.download("AAPL", start="2020-01-01", end="2026-04-13", auto_adjust=True)
-
-    # ✅ Проверка что данные пришли
-    if raw is None or raw.empty:
-        return None
-
-    # ✅ Исправляем MultiIndex колонки
     if isinstance(raw.columns, pd.MultiIndex):
         raw.columns = raw.columns.get_level_values(0)
-
     df = raw.reset_index()
     df = df[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']].copy()
-
-    # Инженерия признаков
     df['Price_Range'] = df['High'] - df['Low']
     df['Price_Change'] = df['Close'] - df['Open']
     df['MA_7'] = df['Close'].rolling(window=7).mean()
@@ -43,119 +34,139 @@ def load_data():
 
 @st.cache_resource
 def train_models(_df):
-    features = ['Open', 'High', 'Low', 'Volume', 'Price_Range', 'Price_Change', 'MA_7', 'MA_30', 'Volatility']
-    target = 'Close'
-
-    X = _df[features].values
-    y = _df[target].values
-
+    features = ['Open', 'High', 'Low', 'Volume', 'Price_Range', 'MA_7', 'MA_30']
     scaler_X = MinMaxScaler()
     scaler_y = MinMaxScaler()
-
-    X_scaled = scaler_X.fit_transform(X)
-    y_scaled = scaler_y.fit_transform(y.reshape(-1, 1)).ravel()
-
-    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_scaled, test_size=0.2, random_state=42)
-
-    # Обучение моделей
-    ridge = Ridge(alpha=1.0)
-    ridge.fit(X_train, y_train)
-
+    X = scaler_X.fit_transform(_df[features])
+    y = scaler_y.fit_transform(_df[['Close']])
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, shuffle=False)
+    ridge = Ridge(alpha=0.001)
+    ridge.fit(X_train, y_train.ravel())
     rf = RandomForestRegressor(n_estimators=100, random_state=42)
-    rf.fit(X_train, y_train)
-
+    rf.fit(X_train, y_train.ravel())
     knn = KNeighborsRegressor(n_neighbors=5)
-    knn.fit(X_train, y_train)
-
+    knn.fit(X_train, y_train.ravel())
     return ridge, rf, knn, scaler_X, scaler_y, X_test, y_test
 
-def get_metrics(model, X_test, y_test, scaler_y):
-    y_pred_scaled = model.predict(X_test)
-    y_pred = scaler_y.inverse_transform(y_pred_scaled.reshape(-1, 1)).ravel()
-    y_true = scaler_y.inverse_transform(y_test.reshape(-1, 1)).ravel()
-
-    mae = mean_absolute_error(y_true, y_pred)
-    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-    r2 = r2_score(y_true, y_pred)
-    return mae, rmse, r2, y_true, y_pred
-
-# ──────────────────────────────────────────────
-# ЗАГРУЗКА ДАННЫХ
-# ──────────────────────────────────────────────
-with st.spinner("Загружаем данные AAPL с Yahoo Finance..."):
+with st.spinner("Loading data..."):
     df = load_data()
-
-if df is None or df.empty:
-    st.error("❌ Не удалось загрузить данные. Проверьте интернет-соединение или попробуйте позже.")
-    st.stop()
-
-st.success(f"✅ Данные загружены: {len(df)} строк")
-
-# ──────────────────────────────────────────────
-# ПРОСМОТР ДАННЫХ
-# ──────────────────────────────────────────────
-with st.expander("📊 Просмотр данных"):
-    st.dataframe(df.tail(20), use_container_width=True)
-
-# ──────────────────────────────────────────────
-# ГРАФИК ЦЕН
-# ──────────────────────────────────────────────
-st.subheader("📈 История цен закрытия AAPL")
-fig, ax = plt.subplots(figsize=(12, 4))
-ax.plot(df['Date'], df['Close'], color='royalblue', linewidth=1.5, label='Close Price')
-ax.plot(df['Date'], df['MA_7'], color='orange', linewidth=1, linestyle='--', label='MA 7')
-ax.plot(df['Date'], df['MA_30'], color='green', linewidth=1, linestyle='--', label='MA 30')
-ax.set_xlabel("Дата")
-ax.set_ylabel("Цена ($)")
-ax.legend()
-ax.grid(True, alpha=0.3)
-st.pyplot(fig)
-
-# ──────────────────────────────────────────────
-# ОБУЧЕНИЕ МОДЕЛЕЙ
-# ──────────────────────────────────────────────
-st.subheader("🤖 Сравнение моделей машинного обучения")
-
-with st.spinner("Обучаем модели..."):
     ridge, rf, knn, scaler_X, scaler_y, X_test, y_test = train_models(df)
 
-model_names = ["Ridge Regression", "Random Forest", "KNN"]
-models = [ridge, rf, knn]
+st.sidebar.title("Settings")
+model_choice = st.sidebar.selectbox(
+    "Choose a model:",
+    ["Ridge Regression (Best)", "Random Forest", "KNN Regressor"]
+)
+st.sidebar.markdown("---")
+st.sidebar.info("Course: MO 3208\nDataset: AAPL Yahoo Finance\nPeriod: 2020-2026\nTask: Regression")
 
-results = []
-predictions = {}
+st.header("Dataset Overview")
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Total Records", str(len(df)))
+col2.metric("Date Range", "2020 - 2026")
+col3.metric("Features Used", "7")
+col4.metric("Latest Close", "$" + str(round(float(df['Close'].iloc[-1]), 2)))
 
-for name, model in zip(model_names, models):
-    mae, rmse, r2, y_true, y_pred = get_metrics(model, X_test, y_test, scaler_y)
-    results.append({"Модель": name, "MAE": round(mae, 4), "RMSE": round(rmse, 4), "R²": round(r2, 4)})
-    predictions[name] = (y_true, y_pred)
+with st.expander("View Raw Data"):
+    st.dataframe(df[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']].tail(20))
 
-results_df = pd.DataFrame(results)
+st.header("AAPL Closing Price History")
+fig1, ax1 = plt.subplots(figsize=(12, 4))
+ax1.plot(df['Date'], df['Close'], color='steelblue', linewidth=1.5, label='Close')
+ax1.plot(df['Date'], df['MA_7'], color='orange', linewidth=1, label='MA 7')
+ax1.plot(df['Date'], df['MA_30'], color='red', linewidth=1, label='MA 30')
+ax1.set_title('AAPL Closing Price with Moving Averages')
+ax1.set_xlabel('Date')
+ax1.set_ylabel('Price (USD)')
+ax1.legend()
+ax1.grid(alpha=0.3)
+plt.tight_layout()
+st.pyplot(fig1)
+plt.close()
+
+st.header("Model Performance Comparison")
+y_test_inv = scaler_y.inverse_transform(y_test)
+ridge_pred = scaler_y.inverse_transform(ridge.predict(X_test).reshape(-1, 1))
+rf_pred = scaler_y.inverse_transform(rf.predict(X_test).reshape(-1, 1))
+knn_pred = scaler_y.inverse_transform(knn.predict(X_test).reshape(-1, 1))
+
+results_df = pd.DataFrame({
+    'Model': ['Ridge Regression', 'Random Forest', 'KNN Regressor'],
+    'MAE': [
+        round(mean_absolute_error(y_test_inv, ridge_pred), 4),
+        round(mean_absolute_error(y_test_inv, rf_pred), 4),
+        round(mean_absolute_error(y_test_inv, knn_pred), 4)
+    ],
+    'MSE': [
+        round(mean_squared_error(y_test_inv, ridge_pred), 4),
+        round(mean_squared_error(y_test_inv, rf_pred), 4),
+        round(mean_squared_error(y_test_inv, knn_pred), 4)
+    ],
+    'R2': [
+        round(r2_score(y_test_inv, ridge_pred), 4),
+        round(r2_score(y_test_inv, rf_pred), 4),
+        round(r2_score(y_test_inv, knn_pred), 4)
+    ]
+})
 st.dataframe(results_df, use_container_width=True)
 
-# ──────────────────────────────────────────────
-# ГРАФИКИ ПРЕДСКАЗАНИЙ
-# ──────────────────────────────────────────────
-st.subheader("🎯 Предсказания vs Реальные значения")
+st.header("Predicted vs Actual Price")
+if model_choice == "Ridge Regression (Best)":
+    selected_pred = ridge_pred
+    selected_name = "Ridge Regression"
+    color = 'steelblue'
+elif model_choice == "Random Forest":
+    selected_pred = rf_pred
+    selected_name = "Random Forest"
+    color = 'green'
+else:
+    selected_pred = knn_pred
+    selected_name = "KNN Regressor"
+    color = 'red'
 
-fig, axes = plt.subplots(1, 3, figsize=(16, 4))
-colors = ['royalblue', 'green', 'orange']
-
-for ax, (name, (y_true, y_pred)), color in zip(axes, predictions.items(), colors):
-    ax.scatter(y_true, y_pred, alpha=0.4, color=color, s=10)
-    min_val = min(y_true.min(), y_pred.min())
-    max_val = max(y_true.max(), y_pred.max())
-    ax.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=1)
-    ax.set_title(name)
-    ax.set_xlabel("Реальное")
-    ax.set_ylabel("Предсказанное")
-    ax.grid(True, alpha=0.3)
-
+fig2, ax2 = plt.subplots(figsize=(12, 4))
+ax2.plot(y_test_inv, label='Actual Price', color='black', linewidth=2)
+ax2.plot(selected_pred, label=selected_name + ' Prediction', color=color, linewidth=1.5)
+ax2.set_title(selected_name + ': Predicted vs Actual')
+ax2.set_xlabel('Days (Test Set)')
+ax2.set_ylabel('Price (USD)')
+ax2.legend()
+ax2.grid(alpha=0.3)
 plt.tight_layout()
-st.pyplot(fig)
+st.pyplot(fig2)
+plt.close()
 
-# ──────────────────────────────────────────────
-# ВЫВОД ЛУЧШЕЙ МОДЕЛИ
-# ──────────────────────────────────────────────
-best = results_df.loc[results_df['R²'].idxmax()]
-st.success(f"🏆 Лучшая модель по R²: **{best['Модель']}** | R² = {best['R²']} | MAE = {best['MAE']}")
+st.header("Predict Closing Price")
+st.markdown("Enter stock data to get a predicted closing price:")
+
+col1, col2 = st.columns(2)
+with col1:
+    open_price = st.number_input("Open Price (USD)", min_value=50.0, max_value=500.0, value=259.0)
+    high_price = st.number_input("High Price (USD)", min_value=50.0, max_value=500.0, value=261.0)
+with col2:
+    low_price = st.number_input("Low Price (USD)", min_value=50.0, max_value=500.0, value=257.0)
+    volume = st.number_input("Volume", min_value=1000000, max_value=500000000, value=28000000, step=1000000)
+
+price_range = high_price - low_price
+ma_7 = float(df['Close'].tail(7).mean())
+ma_30 = float(df['Close'].tail(30).mean())
+
+if st.button("Predict Closing Price", use_container_width=True):
+    input_data = np.array([[open_price, high_price, low_price, volume, price_range, ma_7, ma_30]])
+    input_scaled = scaler_X.transform(input_data)
+    if model_choice == "Ridge Regression (Best)":
+        model = ridge
+    elif model_choice == "Random Forest":
+        model = rf
+    else:
+        model = knn
+    prediction = scaler_y.inverse_transform(model.predict(input_scaled).reshape(-1, 1))[0][0]
+    st.success("Predicted Closing Price: $" + str(round(prediction, 2)))
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Open Price", "$" + str(round(open_price, 2)))
+    c2.metric("Predicted Close", "$" + str(round(prediction, 2)))
+    c3.metric("Model Used", selected_name)
+
+st.markdown("---")
+st.caption("MO 3208 Machine Learning Algorithms | Astana IT University 2026")
