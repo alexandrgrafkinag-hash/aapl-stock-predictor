@@ -14,7 +14,7 @@ warnings.filterwarnings('ignore')
 
 st.set_page_config(page_title="AAPL Stock Price Predictor", layout="wide")
 st.title("AAPL Stock Price Prediction")
-st.markdown("**Machine Learning Algorithms Course | MO 3208**")
+st.markdown("**Machine Learning Algorithms Course | CS-2406**")
 st.markdown("---")
 
 @st.cache_data
@@ -74,7 +74,7 @@ model_choice = st.sidebar.selectbox(
     ["Ridge Regression (Best)", "Random Forest", "KNN Regressor"]
 )
 st.sidebar.markdown("---")
-st.sidebar.info("Course: MO 3208\nDataset: AAPL Yahoo Finance\nPeriod: 2020-2026\nTask: Regression")
+st.sidebar.info("CS-2406\nDataset: AAPL Yahoo Finance\nPeriod: 2020-2026\nTask: Regression")
 
 st.header("Dataset Overview")
 m1, m2, m3, m4 = st.columns(4)
@@ -185,4 +185,4 @@ if st.button("Predict Closing Price", use_container_width=True):
     r3.metric("Model Used", selected_name)
 
 st.markdown("---")
-st.caption("MO 3208 Machine Learning Algorithms | Astana IT University 2026")
+st.caption("CS-2406 Machine Learning Algorithms | Astana IT University 2026")
